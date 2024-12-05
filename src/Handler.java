@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.StringTokenizer;
 
@@ -182,10 +183,10 @@ public class Handler extends Thread {
 
             String httpResponse;
             if (file.exists())
-                httpResponse = "HTTP/1.1 201 Actualizado";
+                httpResponse = "HTTP/1.1 201 Updated";
 
             else
-                httpResponse = "HTTP/1.1 202 Creado";
+                httpResponse = "HTTP/1.1 202 Created";
 
 
             try (FileOutputStream fos = new FileOutputStream(file)) {
@@ -219,7 +220,7 @@ public class Handler extends Thread {
             int contentLength = responseBody.getBytes().length;
 
             //Mandamos a crear la cabecera
-            String responseHeaders = constructHeader("HTTP/1.1 202 Parámetros enviados", "text/html", contentLength);
+            String responseHeaders = constructHeader("HTTP/1.1 202 OK: Parámetros enviados", "text/html", contentLength);
             System.out.println("Response headers:\n" + ANSI_BLUE + responseHeaders + ANSI_RESET);
             bos.write(responseHeaders.getBytes());
             bos.flush();
@@ -248,6 +249,33 @@ public class Handler extends Thread {
     // Función DELETE
     private void deleteHandler(String request) throws IOException {
         String fileName = getFileName(request);
+        try{
+            File file = new File(absolute_path, fileName);
+
+            //Verifica si el archivo existe
+            if(!file.exists()){
+                sendError("404", "Not Found");
+                return;
+            }
+
+            //Verifica que sea un archivo y no una carpeta
+            if(!file.isFile()){
+                sendError("403", "Forbidden: Not a file");
+            }
+
+            //Intentamos eliminar el archivo
+            if(file.delete()){
+                String responseHeaders = constructHeader("HTTP/1.1 200 OK", "", 0);
+                System.out.println("Response headers:\n" + ANSI_BLUE + responseHeaders + ANSI_RESET);
+                bos.write(responseHeaders.getBytes());
+                bos.flush();
+            } else{
+             sendError("500", "Internal Server Error: Could not delete file");
+            }
+        } catch (IOException e){
+            e.printStackTrace();
+            sendError("500", "Internal Server Error");
+        }
     }
 
     // Función para obtener el nombre del archivo
@@ -255,6 +283,7 @@ public class Handler extends Thread {
         // Divide la línea de estado en palabras (método, archivo, protocolo)
         //EJ. HEAD_/_HTTP/1.1  (LOS GUIONES BAJOS SON LOS ESPACIOS)
         String[] parts = statusLine.split(" ");
+        System.out.println("partes" + statusLine);
 
         // El archivo solicitado está en la segunda palabra (índice 1)
         String file = parts[1]; // Ejemplo: "/archivo.html"
